@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -28,41 +27,53 @@ import java.util.concurrent.Executors;
  * Created by huangzongcheng on 2018/6/4.14:49
  * 328854225@qq.com
  */
-public class HzcBluetoothAclService implements Runnable {
-    static final String tag = "HzcBluetoothAclService";
-    static HzcBluetoothAclService hzcBluetoothAclService = Inner.hzcBluetoothAclService;
-    boolean scaning = false, btWaitConnecting = false, autoBond = false, retryScanDevice = true, retryConnection = true;
-    int retrySize = 4;
-    Executor threadPool = Executors.newCachedThreadPool();
-    BluetoothServerSocket serverSoctet;
-    BluetoothAdapter mBtAdapter;
-    Activity activity;
-    Map<String, BluetoothSocket> clientSocketMap = new HashMap<>();
+public class HzcBluetoothAclService {
+    //默认蓝牙通道UUID
+    private static final String BTUUID = "00001101-0000-1000-8000-00805F9B34FB";
+    private static final String tag = "HzcBluetoothAclService";
+    private static HzcBluetoothAclService hzcBluetoothAclService = Inner.hzcBluetoothAclService;
+    private boolean scaning, btWaitConnecting, autoBond, enableRetryScanDevice = true, inited;
+    private int retrySize = 4;
+    private String sdpName = "HZC.AclTtSdpService";
+
+    private Executor threadPool = Executors.newCachedThreadPool();
+    private BluetoothServerSocket serverSoctet;
+    private BluetoothAdapter mBtAdapter;
+    private Activity activity;
+    private Map<String, BluetoothSocket> clientSocketMap = new HashMap<>();
 
 
-    BtBoradcaseReceiver btBoradcaseReceiver;
-    OnScanStartedListence onScanStartedListence;
-    OnScanFinishedListence onScanFinishedListence;
-    OnFindDeviceListence onFindDeviceListence;
-    OnRequestBoundListence onRequestBoundListence;
-    OnConnectionListence onConnectionListence;
-    List<OnBluetoothEnableListence> onBluetoothEnableListenceList = new ArrayList<>();
-    OnBtServiceListence onBtServiceListence;
+    private BtBoradcaseReceiver btBoradcaseReceiver;
+    private OnScanListence onScanListence;
+    private OnRequestBoundListence onRequestBoundListence;
+    private OnConnectionStatusListence onConnectionStatusListence;
+    private List<OnBluetoothEnableListence> onBluetoothEnableListenceList = new ArrayList<>();
+    private OnBtServiceListence onBtServiceListence;
 
     private void HzcBluetoothService() {
 
     }
 
+    /**
+     * 设置重试操作次数
+     *
+     * @param retrySize
+     */
     public void setRetrySize(int retrySize) {
         this.retrySize = retrySize;
     }
 
-    public void setRetryScanDevice(boolean retryScanDevice) {
-        this.retryScanDevice = retryScanDevice;
+    public void setSdpName(String sdpName) {
+        this.sdpName = sdpName;
     }
 
-    public void setRetryConnection(boolean retryConnection) {
-        this.retryConnection = retryConnection;
+    /**
+     * 是否启动重试搜索
+     *
+     * @param enableRetryScanDevice
+     */
+    public void setEnableRetryScanDevice(boolean enableRetryScanDevice) {
+        this.enableRetryScanDevice = enableRetryScanDevice;
     }
 
     /**
@@ -90,32 +101,14 @@ public class HzcBluetoothAclService implements Runnable {
         return hzcBluetoothAclService;
     }
 
+    /**
+     * 单例返回
+     */
     static class Inner {
         static HzcBluetoothAclService hzcBluetoothAclService;
 
         static {
             hzcBluetoothAclService = new HzcBluetoothAclService();
-        }
-    }
-
-    @Override
-    public void run() {
-        try {
-            if (onBtServiceListence == null) {
-                onBtServiceListence = getNullImpl(OnBtServiceListence.class);
-            }
-            onBtServiceListence.onStarting();
-            serverSoctet = mBtAdapter.listenUsingRfcommWithServiceRecord("btspp", java.util.UUID.fromString(HzcBluetoothConfig.BTUUID));
-            //每获得一个循环，表示有一台新的机器在尝试链接
-            while (btWaitConnecting) {
-                BluetoothSocket soctet = serverSoctet.accept();
-                onBtServiceListence.onNewConnection(soctet);
-                clientSocketMap.put(soctet.getRemoteDevice().getAddress(), soctet);
-            }
-            onBtServiceListence.onStop();
-        } catch (Exception e) {
-            Log.i(tag, e.toString());
-            onBtServiceListence.onError(e.toString());
         }
     }
 
@@ -151,9 +144,12 @@ public class HzcBluetoothAclService implements Runnable {
      * @param activity
      */
     public void init(Activity activity) {
+        if (inited)
+            return;
         this.activity = activity;
         hzcBluetoothAclService.mBtAdapter = BluetoothAdapter.getDefaultAdapter();
         initBoradcase();
+        inited = true;
     }
 
     /**
@@ -196,14 +192,25 @@ public class HzcBluetoothAclService implements Runnable {
                 e.printStackTrace();
             }
         }
+        if (!clientSocketMap.isEmpty()) {
+            for (String key : clientSocketMap.keySet()) {
+                try {
+                    clientSocketMap.get(key).close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                clientSocketMap.remove(key);
+            }
+        }
     }
 
     /**
      * 开启蓝牙链接服务
      */
     public void startBtConnectonService(final String displayName) {
-        setDiscoverableTimeout(60 * 60 * 24);
         //多少秒内允许蓝牙是可见的
+        setDiscoverableTimeout(60 * 60 * 24);
+        //这个可见事件最大值是300秒
 //        Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
 //        discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
 //        activity.startActivity(discoverableIntent);
@@ -231,7 +238,29 @@ public class HzcBluetoothAclService implements Runnable {
         }
         mBtAdapter.setName(displayName);
         btWaitConnecting = true;
-        threadPool.execute(this);
+        //客户端接入线程
+        threadPool.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (onBtServiceListence == null) {
+                        onBtServiceListence = getNullImpl(OnBtServiceListence.class);
+                    }
+                    onBtServiceListence.onStarting();
+                    serverSoctet = mBtAdapter.listenUsingRfcommWithServiceRecord(sdpName, java.util.UUID.fromString(BTUUID));
+                    //每获得一个循环，表示有一台新的机器在尝试链接
+                    while (btWaitConnecting) {
+                        BluetoothSocket soctet = serverSoctet.accept();
+                        clientSocketMap.put(soctet.getRemoteDevice().getAddress(), soctet);
+                        onBtServiceListence.onNewConnection(soctet);
+                    }
+                    onBtServiceListence.onStop();
+                } catch (Exception e) {
+                    Log.i(tag, e.toString());
+                    onBtServiceListence.onError(e.toString());
+                }
+            }
+        });
     }
 
     /**
@@ -257,6 +286,8 @@ public class HzcBluetoothAclService implements Runnable {
      * 反初始化
      */
     public void unInit() {
+        if (!inited)
+            return;
         this.activity.unregisterReceiver(btBoradcaseReceiver);
         //停止链接服务
         btWaitConnecting = false;
@@ -278,6 +309,7 @@ public class HzcBluetoothAclService implements Runnable {
             mBtAdapter = null;
         }
         this.activity = null;
+        inited = false;
     }
 
     /**
@@ -294,27 +326,23 @@ public class HzcBluetoothAclService implements Runnable {
 
     /**
      * 开启蓝牙搜索
-     *
-     * @param listence
      */
-    public void doScanBtDevice(OnScanStatusListence listence) {
-        doScanBtDevice(listence, 0);
+    public void doScanBtDevice() {
+        doScanBtDevice(0);
     }
 
     /**
      * 开启蓝牙搜索
      *
-     * @param listence
      * @param retryIndex 重试3次
      */
-    private void doScanBtDevice(OnScanStatusListence listence, final int retryIndex) {
-        if (listence == null) {
-            listence = getNullImpl(OnScanStatusListence.class);
+    private void doScanBtDevice(final int retryIndex) {
+        if (onScanListence == null) {
+            onScanListence = getNullImpl(OnScanListence.class);
         }
-        final OnScanStatusListence onScanStatusListence = listence;
         //超过4次不再重试搜索，发送失败通知
-        if (retryIndex > (retryScanDevice ? retrySize : 1)) {
-            onScanStatusListence.onError();
+        if (retryIndex > (enableRetryScanDevice ? retrySize : 1)) {
+            onScanListence.onError();
             return;
         }
         //蓝牙状态监听事件
@@ -323,7 +351,7 @@ public class HzcBluetoothAclService implements Runnable {
             public void onEnable() {
                 Log.i(tag, "retry scan device");
                 onBluetoothEnableListenceList.remove(this);
-                doScanBtDevice(onScanStatusListence, retryIndex + 1);
+                doScanBtDevice(retryIndex + 1);
             }
 
             @Override
@@ -340,14 +368,14 @@ public class HzcBluetoothAclService implements Runnable {
         //启动搜索
         if (mBtAdapter.startDiscovery()) {
             Log.i(tag, "scan success");
-            onScanStatusListence.onSuccess();
+            onScanListence.onSuccess();
             return;
         }
         //启动重试机制
-        if (retryScanDevice) {
+        if (enableRetryScanDevice) {
             addOnBluetoothEnableListence(l1);
             doEnableBt(false);
-            onScanStatusListence.onRetry(retryIndex + 1);
+            onScanListence.onRetry(retryIndex + 1);
             Log.i(tag, "retry enable scan device for " + retryIndex);
             return;
         }
@@ -447,7 +475,7 @@ public class HzcBluetoothAclService implements Runnable {
      * @return
      */
     private BluetoothSocket doConnectionWithUUID(BluetoothDevice device) throws IOException {
-        BluetoothSocket socket = device.createInsecureRfcommSocketToServiceRecord(UUID.fromString(HzcBluetoothConfig.BTUUID));
+        BluetoothSocket socket = device.createInsecureRfcommSocketToServiceRecord(UUID.fromString(BTUUID));
         socket.connect();
         return socket;
     }
@@ -464,16 +492,16 @@ public class HzcBluetoothAclService implements Runnable {
                 //开启搜索
                 case BluetoothAdapter.ACTION_DISCOVERY_STARTED: {
                     scaning = true;
-                    if (onScanStartedListence != null) {
-                        onScanStartedListence.onScanStarted();
+                    if (onScanListence != null) {
+                        onScanListence.onScanStarted();
                     }
                 }
                 break;
                 //搜索完成
                 case BluetoothAdapter.ACTION_DISCOVERY_FINISHED: {
                     scaning = false;
-                    if (onScanFinishedListence != null) {
-                        onScanFinishedListence.onScanFinished();
+                    if (onScanListence != null) {
+                        onScanListence.onDiscoveryFinished();
                     }
                 }
                 break;
@@ -481,8 +509,8 @@ public class HzcBluetoothAclService implements Runnable {
                 case BluetoothDevice.ACTION_FOUND: {
                     scaning = true;
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (onFindDeviceListence != null) {
-                        onFindDeviceListence.onFindDevice(device);
+                    if (onScanListence != null) {
+                        onScanListence.onFindDevice(device);
                     }
                 }
                 break;
@@ -509,17 +537,18 @@ public class HzcBluetoothAclService implements Runnable {
                 //已链接
                 case BluetoothDevice.ACTION_ACL_CONNECTED: {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (onConnectionListence != null) {
-                        onConnectionListence.onConnectioned(device);
+                    if (onConnectionStatusListence != null) {
+                        onConnectionStatusListence.onConnectioned(device);
                     }
                 }
                 break;
                 //断开链接
                 case BluetoothDevice.ACTION_ACL_DISCONNECTED: {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (onConnectionListence != null) {
-                        onConnectionListence.onDisconnected(device);
+                    if (onConnectionStatusListence != null) {
+                        onConnectionStatusListence.onDisconnected(device);
                     }
+                    clientSocketMap.remove(device.getAddress());
                 }
                 break;
                 //配对中
@@ -591,42 +620,46 @@ public class HzcBluetoothAclService implements Runnable {
         return clientSocketMap;
     }
 
-    public void setOnFindDeviceListence(OnFindDeviceListence onFindDeviceListence) {
-        this.onFindDeviceListence = onFindDeviceListence;
+    public void setOnRequestBoundListence(OnRequestBoundListence onRequestBoundListence) {
+        this.onRequestBoundListence = onRequestBoundListence;
     }
 
-    public void setOnScanFinishedListence(OnScanFinishedListence onScanFinishedListence) {
-        this.onScanFinishedListence = onScanFinishedListence;
-    }
-
-    public void setOnScanStartedListence(OnScanStartedListence onScanStartedListence) {
-        this.onScanStartedListence = onScanStartedListence;
+    public void setOnScanListence(OnScanListence onScanListence) {
+        this.onScanListence = onScanListence;
     }
 
     public void setOnBtServiceListence(OnBtServiceListence onBtServiceListence) {
         this.onBtServiceListence = onBtServiceListence;
     }
 
-    public void setOnConnectionListence(OnConnectionListence onConnectionListence) {
-        this.onConnectionListence = onConnectionListence;
+    public void setOnConnectionStatusListence(OnConnectionStatusListence onConnectionStatusListence) {
+        this.onConnectionStatusListence = onConnectionStatusListence;
     }
 
     public void addOnBluetoothEnableListence(OnBluetoothEnableListence listence) {
         onBluetoothEnableListenceList.add(listence);
     }
 
-    public interface OnScanStartedListence {
+    /**
+     * 搜索状态事件监听
+     */
+    public interface OnScanListence {
+        void onSuccess();
+
+        void onError();
+
+        void onRetry(int index);
+
         void onScanStarted();
-    }
 
-    public interface OnScanFinishedListence {
-        void onScanFinished();
-    }
-
-    public interface OnFindDeviceListence {
         void onFindDevice(BluetoothDevice bluetoothDevice);
+
+        void onDiscoveryFinished();
     }
 
+    /**
+     * 绑定配对事件监听
+     */
     public interface OnRequestBoundListence {
         void boundFailed();
 
@@ -635,26 +668,27 @@ public class HzcBluetoothAclService implements Runnable {
         void boundSuccess();
     }
 
-    public interface OnConnectionListence {
+    /**
+     * 链接状态监听
+     */
+    public interface OnConnectionStatusListence {
         void onConnectioned(BluetoothDevice device);
 
         void onDisconnected(BluetoothDevice device);
     }
 
+    /**
+     * 蓝牙启动事件监听
+     */
     public interface OnBluetoothEnableListence {
         void onEnable();
 
         void onDisable();
     }
 
-    public interface OnScanStatusListence {
-        void onSuccess();
-
-        void onError();
-
-        void onRetry(int index);
-    }
-
+    /**
+     * 蓝牙服务事件监听
+     */
     public interface OnBtServiceListence {
 
         void onStarting();
@@ -666,6 +700,9 @@ public class HzcBluetoothAclService implements Runnable {
         void onStop();
     }
 
+    /**
+     * 链接服务监听事件
+     */
     public interface OnConnectionServiceListence {
         void onConnecting();
 

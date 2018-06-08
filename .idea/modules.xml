@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/hzc.bluetooth.acl.iml" filepath="$PROJECT_DIR$/hzc.bluetooth.acl.iml" />
+      <module fileurl="file://$PROJECT_DIR$/module.hzc.bt/module.hzc.bt.iml" filepath="$PROJECT_DIR$/module.hzc.bt/module.hzc.bt.iml" />
+    </modules>
+  </component>
+</project>

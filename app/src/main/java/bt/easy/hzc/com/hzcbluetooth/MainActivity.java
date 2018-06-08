@@ -15,7 +15,6 @@ import android.widget.TextView;
 
 import com.hzc.easy.bluetooth.HzcBluetoothAclService;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -241,11 +240,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 if (device != null && device.getSocket() != null) {
-                    try {
-                        device.getSocket().close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    HzcBluetoothAclService.getInstance().closeConnection(device.getSocket());
                 }
             }
         });
@@ -330,6 +325,7 @@ public class MainActivity extends AppCompatActivity {
                 HzcBluetoothAclService.getInstance().unInit();
             }
         });
+
     }
 
     private void setMsg(final String msg) {

@@ -128,6 +128,17 @@ public class HzcBluetoothAclService {
         }
     }
 
+    /**
+     * 关闭链接
+     * @param bluetoothSocket
+     */
+    public void closeConnection(BluetoothSocket bluetoothSocket){
+        try {
+            bluetoothSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * 是否搜索中

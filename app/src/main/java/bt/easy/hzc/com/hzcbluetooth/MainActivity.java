@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -165,7 +166,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onFindDevice(BluetoothDevice bluetoothDevice) {
                 lists.add(new MyDevice(bluetoothDevice));
-                adapter.notifyDataSetChanged();
+                adapter = new ArrayAdapter<MyDevice>(MainActivity.this, android.R.layout.simple_list_item_1, lists);
+                list_view.setAdapter(adapter);
+                Log.i(tag, String.format("find device : %s list.code :%d",bluetoothDevice.getName(),lists.hashCode()));
             }
 
             @Override
@@ -191,12 +194,14 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btn_find).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!HzcBluetoothAclService.getInstance().isScaning())
+                if (!HzcBluetoothAclService.getInstance().isScaning()) {
                     lists.clear();
+                }
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        adapter.notifyDataSetChanged();
+                        adapter = new ArrayAdapter<MyDevice>(MainActivity.this, android.R.layout.simple_list_item_1, lists);
+                        list_view.setAdapter(adapter);
                     }
                 });
                 HzcBluetoothAclService.getInstance().doScanBtDevice();
@@ -251,7 +256,8 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 HzcBluetoothAclService.getInstance().doStopBtConnectionService();
                 lists.clear();
-                adapter.notifyDataSetChanged();
+                adapter = new ArrayAdapter<MyDevice>(MainActivity.this, android.R.layout.simple_list_item_1, lists);
+                list_view.setAdapter(adapter);
             }
         });
 
@@ -271,7 +277,8 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        adapter.notifyDataSetChanged();
+                        adapter = new ArrayAdapter<MyDevice>(MainActivity.this, android.R.layout.simple_list_item_1, lists);
+                        list_view.setAdapter(adapter);
                     }
                 });
             }
@@ -302,7 +309,8 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        adapter.notifyDataSetChanged();
+                        adapter = new ArrayAdapter<MyDevice>(MainActivity.this, android.R.layout.simple_list_item_1, lists);
+                        list_view.setAdapter(adapter);
                     }
                 });
             }

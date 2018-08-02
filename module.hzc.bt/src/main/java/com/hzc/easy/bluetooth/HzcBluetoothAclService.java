@@ -598,11 +598,6 @@ public class HzcBluetoothAclService {
                     }
                 }
                 break;
-                //链接状态改变
-                case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED: {
-
-                }
-                break;
             }
         }
     }

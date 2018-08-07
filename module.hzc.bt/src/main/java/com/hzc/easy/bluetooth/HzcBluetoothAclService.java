@@ -130,9 +130,10 @@ public class HzcBluetoothAclService {
 
     /**
      * 关闭链接
+     *
      * @param bluetoothSocket
      */
-    public void closeConnection(BluetoothSocket bluetoothSocket){
+    public void closeConnection(BluetoothSocket bluetoothSocket) {
         try {
             bluetoothSocket.close();
         } catch (IOException e) {
@@ -427,26 +428,46 @@ public class HzcBluetoothAclService {
      * @param listence
      */
     public void doConnection(final BluetoothDevice device, OnConnectionServiceListence listence) {
+        doConnection(device, listence, 5);
+    }
+
+    /**
+     * 链接设备
+     *
+     * @param device
+     * @param listence
+     */
+    public void doConnection(final BluetoothDevice device, OnConnectionServiceListence listence, final int retryTotal) {
         doCancelScan();
         if (listence == null) {
             listence = getNullImpl(OnConnectionServiceListence.class);
         }
         final OnConnectionServiceListence onConnectionServiceListence = listence;
         threadPool.execute(new Runnable() {
+
             @Override
             public void run() {
-                onConnectionServiceListence.onConnecting();
-                //绑定并链接
-                try {
-                    if (doBondDevice(device)) {
-                        BluetoothSocket socket = doConnectionWithUUID(device);
-                        if (socket != null && socket.isConnected()) {
-                            onConnectionServiceListence.onSuccess(socket);
+                for (int i = 0; i < retryTotal; i++) {
+                    onConnectionServiceListence.onConnecting();
+                    //绑定并链接
+                    try {
+                        if (doBondDevice(device)) {
+                            BluetoothSocket socket = doConnectionWithUUID(device);
+                            if (socket != null && socket.isConnected()) {
+                                onConnectionServiceListence.onSuccess(socket);
+                                break;
+                            }
+                        }
+                    } catch (Exception e) {
+                        Log.i(tag, e.toString());
+                        onConnectionServiceListence.onError(e.toString());
+                        try {
+                            Log.i(tag, String.format("retry connection max %d now %d", retryTotal, i + 1));
+                            Thread.sleep(100);
+                        } catch (Exception ex) {
+
                         }
                     }
-                } catch (Exception e) {
-                    Log.i(tag, e.toString());
-                    onConnectionServiceListence.onError(e.toString());
                 }
             }
         });

@@ -228,6 +228,11 @@ public class MainActivity extends AppCompatActivity {
                     public void onError(String message) {
                         setMsg(message);
                     }
+
+                    @Override
+                    public void onFailed() {
+
+                    }
                 });
 
             }

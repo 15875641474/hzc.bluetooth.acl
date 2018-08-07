@@ -469,6 +469,8 @@ public class HzcBluetoothAclService {
                         }
                     }
                 }
+                Log.i(tag, String.format("retry connection failed"));
+                onConnectionServiceListence.onFailed();
             }
         });
     }
@@ -736,6 +738,8 @@ public class HzcBluetoothAclService {
         void onSuccess(BluetoothSocket socket);
 
         void onError(String message);
+
+        void onFailed();
     }
 
 }

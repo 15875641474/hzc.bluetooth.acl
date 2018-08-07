@@ -455,7 +455,7 @@ public class HzcBluetoothAclService {
                             BluetoothSocket socket = doConnectionWithUUID(device);
                             if (socket != null && socket.isConnected()) {
                                 onConnectionServiceListence.onSuccess(socket);
-                                break;
+                                return;
                             }
                         }
                     } catch (Exception e) {

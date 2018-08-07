@@ -9,7 +9,7 @@ allprojects {
 }
 
 dependencies {
-        implementation 'com.github.15875641474:hzc.bluetooth.acl:1.0.3'
+        implementation 'com.github.15875641474:hzc.bluetooth.acl:1.0.4'
 }
 ```
 
